@@ -1,13 +1,17 @@
+
 const express = require("express");
 const cors = require("cors");
 const net = require("net");
+const path = require("path");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Function to check host
+// Serving static files (CSS, JS, Images)
+app.use(express.static(__dirname));
+
 async function checkHost(ip, port = 53, timeout = 2000) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
@@ -48,12 +52,12 @@ app.post("/check", async (req, res) => {
     }
 });
 
-// Root route (fixes Cannot GET /)
+// Serve HTML file on Root route
 app.get("/", (req, res) => {
-    res.send("Server is running 🚀");
+    res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Start server (important for Render)
+// Start server
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
