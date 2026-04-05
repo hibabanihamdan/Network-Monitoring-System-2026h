@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Monitoring System</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #eef2f7;
+            margin: 0;
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin: 20px;
+        }
+
+        .container {
+            background: white;
+            width: 500px;
+            margin: auto;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .add-btn { background: #3498db; color: white; }
+        .delete-btn { background: #e74c3c; color: white; }
+        .edit-btn { background: #f39c12; color: white; }
+        .check-btn { background: #2ecc71; color: white; }
+
+        li {
+            list-style: none;
+            background: #f9fafc;
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .status {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+
+        .online { background: #2ecc71; color: white; }
+        .offline { background: #e74c3c; color: white; }
+
+        #stats {
+            margin: 10px;
+            font-weight: bold;
+        }
+
+        #resultBox {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f4f6f8;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Network Monitoring System</h1>
+
+<div class="container">
+
+    <input type="text" id="search" placeholder="Search..." onkeyup="displayDevices()">
+
+    <input type="text" id="deviceName" placeholder="Device Name">
+    <input type="text" id="ipAddress" placeholder="IP / Website">
+
+    <button class="add-btn" onclick="addDevice()">Add Device</button>
+    <button class="check-btn" onclick="checkDevice()">Check Device</button>
+
+    <div id="resultBox">No check yet</div>
+
+    <div id="stats"></div>
+
+    <ul id="deviceList"></ul>
+
+</div>
+
+<script>
+    let devices = JSON.parse(localStorage.getItem("devices")) || [];
+
+    function addDevice() {
+        let name = document.getElementById("deviceName").value;
+        let ip = document.getElementById("ipAddress").value;
+
+        if (!name || !ip) {
+            alert("Please fill all fields");
+            return;
+        }
+
+        devices.push({
+            name,
+            ip,
+            status: "Unknown",
+            time: new Date().toLocaleString()
+        });
+
+        save();
+        displayDevices();
+    }
+
+    function displayDevices() {
+        let list = document.getElementById("deviceList");
+        let search = document.getElementById("search").value.toLowerCase();
+
+        list.innerHTML = "";
+
+        let total = devices.length;
+        let online = devices.filter(d => d.status === "Online").length;
+        let offline = devices.filter(d => d.status === "Offline").length;
+
+        document.getElementById("stats").innerText =
+            `Total: ${total} | Online: ${online} | Offline: ${offline}`;
+
+        devices.forEach((d, i) => {
+            if (!d.name.toLowerCase().includes(search)) return;
+
+            let li = document.createElement("li");
+
+            li.innerHTML = `
+                <b>${d.name}</b> - ${d.ip}
+                <span class="status ${d.status === "Online" ? "online" : "offline"}">
+                    ${d.status}
+                </span>
+                <br>
+                <small>Last: ${d.time}</small>
+                <br>
+                <button class="edit-btn" onclick="editDevice(${i})">Edit</button>
+                <button class="delete-btn" onclick="deleteDevice(${i})">Delete</button>
+            `;
+
+            list.appendChild(li);
+        });
+    }
+
+    function deleteDevice(i) {
+        devices.splice(i, 1);
+        save();
+        displayDevices();
+    }
+
+    function editDevice(i) {
+        let name = prompt("New Name:", devices[i].name);
+        let ip = prompt("New IP:", devices[i].ip);
+
+        if (name && ip) {
+            devices[i].name = name;
+            devices[i].ip = ip;
+            devices[i].time = new Date().toLocaleString();
+
+            save();
+            displayDevices();
+        }
+    }
+
+    async function checkDevice() {
+        let ip = document.getElementById("ipAddress").value;
+        let box = document.getElementById("resultBox");
+
+        if (!ip) {
+            alert("Enter IP or website");
+            return;
+        }
+
+        box.innerHTML = "Checking...";
+
+        try {
+            const response = await fetch("http://localhost:3000/check", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ip: ip })
+            });
+
+            const data = await response.json();
+
+            let statusText = data.status; // Online / Offline
+
+            box.innerHTML = `${statusText === "Online" ? "🟢" : "🔴"} <b>${ip}</b> is ${statusText}`;
+
+            // Update device if exists
+            let device = devices.find(d => d.ip === ip);
+            if (device) {
+                device.status = statusText;
+                device.time = new Date().toLocaleString();
+                save();
+                displayDevices();
+            }
+
+        } catch (error) {
+            box.innerHTML = "⚠️ Error connecting to server";
+        }
+    }
+
+    function save() {
+        localStorage.setItem("devices", JSON.stringify(devices));
+    }
+
+    window.onload = displayDevices;
+</script>
+
+</body>
+</html>
